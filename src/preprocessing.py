@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+from sklearn.preprocessing import LabelEncoder
 
 TEMPERATURE_COLUMN = 'AverageTemperature'
 
@@ -56,8 +57,48 @@ class Preprocessor:
             temp = grouped_data[k]
             train.append(grouped_data[k][:int(train_size * len(temp))].copy())
             test.append(grouped_data[k][int(train_size * len(temp)):].copy())
+            break
 
         train, test = pd.concat(train).sort_index(), pd.concat(test).sort_index()
-        y_train, y_test = train[TEMPERATURE_COLUMN], test[TEMPERATURE_COLUMN]
-        x_train, x_test = train.drop(TEMPERATURE_COLUMN, axis=1), test.drop(TEMPERATURE_COLUMN,axis=1)
+        print(train.columns)
+        print(test.columns)
+        # one_hot1 = pd.get_dummies(train['City'], prefix='City')
+        # one_hot2 = pd.get_dummies(test['City'], prefix='City')
+        #
+        # train = pd.concat([train, one_hot1], axis=1)
+        # test = pd.concat([test, one_hot2], axis=1)
+        encoder = LabelEncoder()
+        train['EncodedCity'] = encoder.fit_transform(train['City'])
+        encoder = LabelEncoder()
+        test['EncodedCity'] = encoder.fit_transform(test['City'])
+
+        if 'City' in train.columns:
+            train = train.drop('City', axis=1)
+        if 'City' in test.columns:
+            test = test.drop('City', axis=1)
+
+        train['date'] = pd.to_datetime(train['date'])
+        train['day'] = train['date'].dt.day
+        train['month'] = train['date'].dt.month
+        train['year'] = train['date'].dt.year
+        train = train.drop('date', axis=1)
+        train = train.dropna()
+
+        # columns = train.columns
+        # for c in columns:
+        #     train[c] = train[c].interpolate()
+
+        test['date'] = pd.to_datetime(test['date'])
+        test['day'] = test['date'].dt.day
+        test['month'] = test['date'].dt.month
+        test['year'] = test['date'].dt.year
+        test = test.drop('date', axis=1)
+        test = test.dropna()
+
+        # columns = test.columns
+        # for c in columns:
+        #     test[c] = test[c].interpolate()
+
+        y_train, y_test = train['target'], test['target']
+        x_train, x_test = train.drop('target', axis=1), test.drop('target', axis=1)
         return x_train, x_test, y_train, y_test

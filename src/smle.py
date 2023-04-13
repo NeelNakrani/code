@@ -2,12 +2,13 @@ from typing import Any
 
 import numpy as np
 from numpy import ndarray
-
 from sklearn.model_selection import TimeSeriesSplit
 from sklearn.svm import SVR
 from sklearn.neural_network import MLPRegressor
 from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
 from sklearn.metrics import mean_squared_error
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 
 default_models = [
     SVR(kernel='rbf'),
@@ -16,11 +17,17 @@ default_models = [
     GradientBoostingRegressor(n_estimators=100)
 ]
 
+models_with_standard_scaler = [
+    make_pipeline(StandardScaler(), SVR(kernel='rbf')),
+    make_pipeline(StandardScaler(), MLPRegressor(hidden_layer_sizes=(100,), max_iter=1000, learning_rate='adaptive')),
+    RandomForestRegressor(n_estimators=100),
+    GradientBoostingRegressor(n_estimators=100)
+]
+
 
 class SMLE:
-    weights: ndarray | Any
 
-    def __int__(self, base_models: default_models, no_tscv_split: 4, alpha: 0.1):
+    def __init__(self, base_models: default_models, no_tscv_split: 4, alpha: 0.1):
         self.models = base_models
         self.no_tscv_split = no_tscv_split
 
@@ -36,8 +43,8 @@ class SMLE:
 
         for i, model in enumerate(self.models):
             for j, (train_idx, val_idx) in enumerate(tscv.split(x)):
-                x_train, y_train = x[train_idx], y[train_idx]
-                x_val, y_val = x[val_idx], y[val_idx]
+                x_train, y_train = x.iloc[train_idx], y.iloc[train_idx]
+                x_val, y_val = x.iloc[val_idx], y.iloc[val_idx]
                 model.fit(x_train, y_train)
                 y_pred = model.predict(x_val)
                 self.errors[i, j] = mean_squared_error(y_val, y_pred)
@@ -59,6 +66,7 @@ class SMLE:
             grad[i] = np.sum(self.errors[i, j-1:j+1] * weights[i])
         weights = weights - self.alpha * grad
         weights[weights < 0] = 0
+        weights = weights/np.sum(weights)
         return weights
 
     def predict(self, x):
